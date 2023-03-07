@@ -1,6 +1,10 @@
+use super::db_access::*;
+use super::errors::EzyTutorError;
 use super::models::Course;
 use super::state::AppState;
-use actix_web::{web, HttpResponse};
+use std::convert::TryFrom;
+
+use actix_web::{web, App, HttpResponse};
 
 pub async fn health_check_handler(app_state: web::Data<AppState>) -> HttpResponse {
     let health_check_response = &app_state.health_check_response;
@@ -11,24 +15,34 @@ pub async fn health_check_handler(app_state: web::Data<AppState>) -> HttpRespons
 }
 
 pub async fn get_courses_for_tutor(
-    _app_state: web::Data<AppState>,
-    _params: web::Path<(i32,)>,
-) -> HttpResponse {
-    HttpResponse::Ok().json("success")
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> Result<HttpResponse, EzyTutorError> {
+    let tutor_id = path.into_inner();
+    get_courses_for_tutor_db(&app_state.db, tutor_id)
+        .await
+        .map(|course| HttpResponse::Ok().json(course))
 }
 
 pub async fn get_course_details(
-    _app_state: web::Data<AppState>,
-    _params: web::Path<(i32, i32)>,
-) -> HttpResponse {
-    HttpResponse::Ok().json("success")
+    app_state: web::Data<AppState>,
+    params: web::Path<(i32, i32)>,
+) -> Result<HttpResponse, EzyTutorError> {
+    let tuple = params;
+    let tutor_id = i32::try_from(tuple.0).unwrap();
+    let course_id = i32::try_from(tuple.1).unwrap();
+    get_course_details_db(&app_state.db, tutor_id, course_id)
+        .await
+        .map(|course| HttpResponse::Ok().json(course))
 }
 
 pub async fn post_new_course(
-    _new_course: web::Json<Course>,
-    _app_state: web::Data<AppState>,
-) -> HttpResponse {
-    HttpResponse::Ok().json("success")
+    new_course: web::Json<Course>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, EzyTutorError> {
+    post_new_course_db(&app_state.db, new_course.into())
+        .await
+        .map(|course| HttpResponse::Ok().json(course))
 }
 
 #[cfg(test)]
@@ -51,9 +65,9 @@ mod tests {
             visit_count: Mutex::new(0),
             db: pool,
         });
-        let tutor_id: web::Path<(i32,)> = web::Path::from((1,));
+        let tutor_id: web::Path<i32> = web::Path::from(1);
         let resp = get_courses_for_tutor(app_state, tutor_id).await;
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.unwrap().status(), StatusCode::OK);
     }
 
     #[actix_rt::test]
@@ -67,7 +81,7 @@ mod tests {
             db: pool,
         });
         let params: web::Path<(i32, i32)> = web::Path::from((1, 1));
-        let resp = get_course_details(app_state, params).await;
+        let resp = get_course_details(app_state, params).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
@@ -93,7 +107,7 @@ mod tests {
             ),
         };
         let course_param = web::Json(new_course_msg);
-        let resp = post_new_course(course_param, app_state).await;
+        let resp = post_new_course(course_param, app_state).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 }
