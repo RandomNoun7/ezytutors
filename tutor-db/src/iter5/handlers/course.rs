@@ -61,6 +61,7 @@ mod tests {
     use actix_web::ResponseError;
     use chrono::NaiveDate;
     use dotenv::dotenv;
+    use serde::de::IntoDeserializer;
     use sqlx::postgres::PgPool;
     use std::env;
     use std::sync::Mutex;
@@ -153,12 +154,12 @@ mod tests {
         let update_course_msg = UpdateCourse {
             course_name: Some("Course name changed".into()),
             course_description: Some("This is yet another test course".into()),
-            course_format: None,
+            course_format: Some("Course Format".into()),
             course_level: Some("Intermediate".into()),
-            course_price: None,
-            course_duration: None,
+            course_price: Some(1),
+            course_duration: Some("Duration".into()),
             course_language: Some("German".into()),
-            course_structure: None,
+            course_structure: Some("Structure".into()),
         };
         let parameters: web::Path<(i32, i32)> = web::Path::from((1, 2));
         let update_param = web::Json(update_course_msg);
